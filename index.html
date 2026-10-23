@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>X-Void App</title>
+<style>
+  :root { --bg:#111; --fg:#eee; --accent:#ff0055; }
+  body { background:var(--bg); color:var(--fg); font-family:sans-serif; margin:0; padding:16px; }
+  .card { border:1px solid #333; border-radius:12px; padding:12px; margin-bottom:12px; }
+  input, button, textarea, select { width:100%; padding:10px; margin:6px 0; border-radius:8px; border:1px solid #444; background:#1a1a1a; color:var(--fg); box-sizing:border-box; }
+  button { background:var(--accent); color:#fff; border:none; cursor:pointer; }
+  #banner img, #banner video { width:100%; border-radius:8px; }
+  #popup { position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:center; justify-content:center; z-index:99; }
+  #popup .box { background:#222; padding:20px; border-radius:12px; max-width:320px; text-align:center; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+
+<div id="popup"><div class="box">
+  <h3 id="popup-title"></h3>
+  <p id="popup-msg"></p>
+  <button onclick="document.getElementById('popup').style.display='none'">Tutup</button>
+</div></div>
+
+<div id="login" class="card">
+  <h3>Login</h3>
+  <input id="u" placeholder="username">
+  <input id="p" type="password" placeholder="password">
+  <button onclick="login()">Masuk</button>
+  <button onclick="register()">Daftar</button>
+</div>
+
+<div id="main" class="hidden">
+  <div id="banner" class="card"></div>
+
+  <div class="card">
+    <h3>Bug WhatsApp</h3>
+    <select id="bugtype">
+      <option value="justtrymamzz">justtrymamzz</option>
+      <option value="delaysange">DelaySange</option>
+      <option value="alertflood">alertFlood</option>
+      <option value="alertnested">alertNested</option>
+      <option value="alertgroup">alertGroup</option>
+      <option value="alertunicode">alertUnicode</option>
+    </select>
+    <input id="target" placeholder="628xxxx">
+    <button onclick="sendBug()">Kirim Bug</button>
+    <pre id="buglog"></pre>
+  </div>
+
+  <div class="card">
+    <h3>Chat Global</h3>
+    <div id="global"></div>
+    <input id="gmsg" placeholder="pesan...">
+    <button onclick="sendGlobal()">Kirim</button>
+  </div>
+
+  <div class="card">
+    <h3>Chat AI</h3>
+    <div id="ai"></div>
+    <input id="aimsg" placeholder="tanya AI...">
+    <button onclick="sendAI()">Kirim</button>
+  </div>
+
+  <div class="card">
+    <h3>Warna UI</h3>
+    <input type="color" id="bgcolor" value="#111111" onchange="setColor('--bg',this.value)">
+    <input type="color" id="fgcolor" value="#eeeeee" onchange="setColor('--fg',this.value)">
+    <input type="color" id="acccolor" value="#ff0055" onchange="setColor('--accent',this.value)">
+  </div>
+</div>
+
+<script>
+let token = localStorage.getItem("token");
+let user = localStorage.getItem("user");
+
+if (token) showMain();
+
+async function api(path, method="GET", body) {
+  const res = await fetch("/"+path.replace(/^\//,""), {
+    method,
+    headers: { "Content-Type":"application/json", "Authorization": token || "" },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  return res.json();
+}
+
+async function login() {
+  const r = await api("/login","POST",{ username:u.value, password:p.value });
+  if (r.ok) { token = r.token; user = u.value;
+    localStorage.setItem("token", token); localStorage.setItem("user", user);
+    showMain(); }
+  else alert(r.msg);
+}
+
+async function register() {
+  const r = await api("/register","POST",{ username:u.value, password:p.value });
+  alert(r.ok ? "berhasil daftar" : r.msg);
+}
+
+function showMain() {
+  login.classList.add("hidden");
+  main.classList.remove("hidden");
+  loadBanner(); loadPopup(); loadGlobal();
+}
+
+function setColor(v, c) { document.documentElement.style.setProperty(v, c); }
+
+async function loadBanner() {
+  const list = await api("/banner");
+  banner.innerHTML = list.map(b =>
+    b.type === "video"
+      ? `<video src="${b.url}" autoplay muted loop></video>`
+      : `<img src="${b.url}">`
+  ).join("");
+}
+
+async function loadPopup() {
+  const list = await api("/popup");
+  if (list.length) {
+    document.getElementById("popup-title").textContent = list[0].title;
+    document.getElementById("popup-msg").textContent = list[0].message;
+    document.getElementById("popup").style.display = "flex";
+  }
+}
+
+async function sendBug() {
+  const r = await api("/bug","POST",{
+    target: target.value,
+    type: bugtype.value
+  });
+  buglog.textContent = JSON.stringify(r, null, 2);
+}
+
+async function loadGlobal() {
+  const list = await api("/global");
+  global.innerHTML = list.map(m => `<div><b>${m.user}</b>: ${m.text}</div>`).join("");
+}
+async function sendGlobal() {
+  await api("/global","POST",{ text: gmsg.value });
+  gmsg.value = ""; loadGlobal();
+}
+
+async function sendAI() {
+  const r = await api("/ai","POST",{ text: aimsg.value });
+  ai.innerHTML += `<div><b>lo</b>: ${aimsg.value}</div><div><b>AI</b>: ${r.reply}</div>`;
+  aimsg.value = "";
+}
+</script>
+</body>
+</html>
